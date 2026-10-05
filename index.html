@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fitness Tracker</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#14181f;--muted:#6b7380;--line:#e3e6eb;--accent:#e8590c;--accent2:#fff1e8;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--card:#1a1f26;--text:#eef1f5;--muted:#8d97a6;--line:#2a313b;--accent:#ff8a3d;--accent2:#2b2118}}
+:root[data-theme="dark"]{--bg:#111418;--card:#1a1f26;--text:#eef1f5;--muted:#8d97a6;--line:#2a313b;--accent:#ff8a3d;--accent2:#2b2118}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:8px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h2{font-size:1rem;margin:0 0 10px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;background:var(--card);color:var(--muted);border:1px solid var(--line);padding:10px 2px;font-size:.85rem}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.week{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.week .lbl{text-align:center;flex:1}.week .lbl b{display:block}.week .lbl small{color:var(--muted)}
+.nav{background:var(--accent2);color:var(--accent);width:44px;padding:9px}
+.nav:disabled{opacity:.35;cursor:default}
+.wk2{display:flex;gap:8px;margin-top:10px}.wk2 input{flex:1}
+.wk2 button{background:var(--accent2);color:var(--accent);padding:9px 12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--accent2);border-radius:10px;padding:10px}
+.stat b{display:block;font-size:1.2rem;color:var(--accent)}
+.stat span{font-size:.75rem;color:var(--muted)}
+.chart{display:flex;align-items:flex-end;gap:6px;height:130px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:.65rem;color:var(--muted)}
+.bar{width:100%;background:var(--accent);border-radius:6px 6px 0 0;min-height:2px}
+.col .v{margin-bottom:2px}
+.days{display:flex;gap:4px}
+.days button{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--line);padding:6px 0;font-weight:400;font-size:.75rem;line-height:1.3}
+.days button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.days small{display:block;opacity:.75;font-size:.65rem}
+form{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:4px;min-width:0}
+.full{grid-column:1/-1}.two{grid-column:span 2}
+input,select{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px;width:100%;min-width:0}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:11px;background:var(--accent);color:#fff;font-weight:600}
+.del{background:none;color:var(--muted);padding:4px 8px;font-weight:400}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item small{color:var(--muted);display:block}
+.plan{display:flex;gap:4px;margin-left:auto}.plan input{width:80px;padding:6px}.plan button{padding:6px 10px}
+.meal h3{font-size:.9rem;margin:12px 0 2px;display:flex;justify-content:space-between}
+.meal h3 span{color:var(--muted);font-weight:400;font-size:.8rem}
+.total{margin-top:12px;padding:10px;background:var(--accent2);border-radius:10px;display:flex;justify-content:space-between;font-weight:600;color:var(--accent)}
+.empty{color:var(--muted);padding:6px 0;font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Fitness Tracker</h1>
+<div class="tabs" id="tabs"></div>
+<section class="card">
+<div class="week">
+<button class="nav" id="prev" aria-label="Previous week">‹</button>
+<div class="lbl"><b id="wlbl"></b><small id="wsub"></small></div>
+<button class="nav" id="next" aria-label="Next week">›</button>
+</div>
+<div class="wk2"><input type="date" id="jump" aria-label="Jump to date"><button id="thisWk">This week</button></div>
+</section>
+<div id="pages"></div>
+</main>
+<script>
+const KEY="fitness-tracker-v2",GKEY="fitness-gen-v2";
+let data=[],gen=[];
+try{data=JSON.parse(localStorage.getItem(KEY)||"[]")||[];gen=JSON.parse(localStorage.getItem(GKEY)||"[]")||[]}catch(e){}
+data=data.map(e=>e.kind==="cal"?{id:e.id,kind:"food",date:e.date,meal:"Snack",name:e.note||"Entry",cal:e.cal,pro:0}:e);
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data));localStorage.setItem(GKEY,JSON.stringify(gen))}catch(e){}};
+const $=id=>document.getElementById(id);
+const iso=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10)};
+const parse=s=>new Date(s+"T12:00:00");
+const mon=d=>{const x=new Date(d);x.setDate(x.getDate()-(x.getDay()+6)%7);return x};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
+const TODAY=iso(new Date()),CUR=iso(mon(parse(TODAY)));
+const wkOf=s=>iso(mon(parse(s)));
+let uid=Date.now();const nid=()=>++uid;
+let tab="lift",start=mon(parse(TODAY)),selIdx=(parse(TODAY).getDay()+6)%7;
+const fmtD=d=>d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+const n0=n=>Math.round(n).toLocaleString();
+const vol=e=>e.wt?e.sets*e.reps*e.wt:0;
+const pace=(mi,m)=>{if(!mi)return"–";const p=m/mi,mm=Math.floor(p),ss=Math.round((p-mm)*60);return mm+":"+String(ss===60?0:ss).padStart(2,"0")};
+const MEALS=["Breakfast","Lunch","Dinner","Snack"];
+const PAGES={lift:"Lifting",run:"Running",food:"Calories",bw:"Weight"};
+const FORMS={
+lift:`<label class="full">Exercise<input name="name" required placeholder="e.g. Bench press"></label><label>Sets<input name="sets" type="number" min="1" required></label><label>Reps<input name="reps" type="number" min="1" required></label><label>Weight (lbs)<input name="wt" type="number" min="0" step="0.5"></label>`,
+run:`<label>Distance (mi)<input name="mi" type="number" min="0" step="0.01" required></label><label>Time (min)<input name="mins" type="number" min="0" step="0.1" required></label>`,
+food:`<label>Meal<select name="meal">${MEALS.map(m=>`<option>${m}</option>`).join("")}</select></label><label class="two">Food<input name="name" required placeholder="e.g. Oatmeal"></label><label>Calories<input name="cal" type="number" min="0" required></label><label>Protein (g)<input name="pro" type="number" min="0" step="0.1"></label>`,
+bw:`<label>Weight (lbs)<input name="lbs" type="number" min="0" step="0.1" required></label><label class="two">Date<input name="date" type="date" required></label>`};
+const TITLES={lift:["Volume per day (lbs)","Add exercise","Exercises"],run:["Miles per day","Add run","Runs"],food:["Calories per day","Add food","Meals"],bw:["Body weight, last 8 weeks (lbs)","Log weight","This week's weigh-ins"]};
+$("tabs").innerHTML=Object.keys(PAGES).map(k=>`<button data-k="${k}">${PAGES[k]}</button>`).join("");
+$("pages").innerHTML=Object.keys(PAGES).map(k=>`<div id="p-${k}" hidden>
+<section class="card"><h2>${PAGES[k]} summary</h2><div class="stats" id="${k}S"></div></section>
+<section class="card"><h2>${TITLES[k][0]}</h2><div class="chart" id="${k}C"></div></section>
+${k!=="bw"?`<section class="card"><h2>Pick a day</h2><div class="days" id="${k}D"></div></section>`:""}
+<section class="card"><h2>${TITLES[k][1]}</h2><form id="${k}F" data-k="${k}">${FORMS[k]}<button class="full" type="submit">Add</button></form></section>
+<section class="card"><h2>${TITLES[k][2]}</h2><div id="${k}L"></div></section></div>`).join("");
+document.querySelectorAll("input[name=date]").forEach(i=>i.value=TODAY);
+
+function setWeek(d){start=mon(d);selIdx=(d.getDay()+6)%7;render()}
+$("prev").onclick=()=>{start.setDate(start.getDate()-7);render()};
+$("next").onclick=()=>{start.setDate(start.getDate()+7);render()};
+$("thisWk").onclick=()=>setWeek(parse(TODAY));
+$("jump").onchange=e=>{if(e.target.value)setWeek(parse(e.target.value))};
+$("tabs").onclick=e=>{if(e.target.dataset.k){tab=e.target.dataset.k;render()}};
+
+// weekly repeat of lifting: copy last week's exercises (weight left empty)
+function ensure(){
+  const L=data.filter(e=>e.kind==="lift");if(!L.length)return;
+  let w=L.map(e=>wkOf(e.date)).sort()[0];
+  while(w<CUR){
+    const nx=addDays(w,7);
+    if(!gen.includes(nx)){
+      data.filter(e=>e.kind==="lift"&&wkOf(e.date)===w).forEach(e=>data.push({id:nid(),kind:"lift",date:addDays(e.date,7),name:e.name,sets:e.sets,reps:e.reps,wt:null}));
+      gen.push(nx);
+    }
+    w=nx;
+  }
+  save();
+}
+document.addEventListener("submit",ev=>{
+  ev.preventDefault();
+  const form=ev.target,k=form.dataset.k,f=new FormData(form);
+  const num=n=>parseFloat(f.get(n))||0;
+  let o={id:nid(),kind:k,date:k==="bw"?f.get("date"):iso(new Date(start.getTime()+selIdx*864e5))};
+  if(k==="lift"){Object.assign(o,{name:f.get("name").trim(),sets:num("sets"),reps:num("reps"),wt:num("wt")||null});
+    const w=wkOf(o.date);
+    for(let j=1;addDays(w,7*j)<=CUR;j++)if(gen.includes(addDays(w,7*j)))data.push({id:nid(),kind:"lift",date:addDays(o.date,7*j),name:o.name,sets:o.sets,reps:o.reps,wt:null});}
+  if(k==="run")Object.assign(o,{mi:num("mi"),mins:num("mins")});
+  if(k==="food")Object.assign(o,{date:iso(new Date(start.getTime()+selIdx*864e5)),meal:f.get("meal"),name:f.get("name").trim(),cal:num("cal"),pro:num("pro")});
+  if(k==="bw")o.lbs=num("lbs");
+  data.push(o);save();
+  form.querySelectorAll("input:not([type=date])").forEach(i=>i.value="");
+  if(k!=="food"&&wkOf(o.date)!==iso(start))setWeek(parse(o.date));else render();
+});
+
+const stats=(id,a)=>$(id+"S").innerHTML=a.map(s=>`<div class="stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("");
+const chart=(id,labels,vals,hts,fmt=v=>v)=>$(id+"C").innerHTML=labels.map((l,i)=>`<div class="col"><span class="v">${vals[i]?fmt(vals[i]):""}</span><div class="bar" style="height:${vals[i]?hts[i]:0}%"></div><span>${l}</span></div>`).join("");
+const scale=v=>{const m=Math.max(...v,1);return v.map(x=>x/m*80)};
+function row(t,s,id,extra){
+  const r=document.createElement("div");r.className="item";
+  const i=document.createElement("div"),a=document.createElement("strong"),b=document.createElement("small");
+  a.textContent=t;b.textContent=s;i.append(a,b);r.append(i);
+  if(extra)r.append(extra);
+  const x=document.createElement("button");x.className="del";x.textContent="✕";x.setAttribute("aria-label","Delete");
+  x.onclick=()=>{data=data.filter(e=>e.id!==id);save();render()};
+  r.append(x);return r;
+}
+const fill=(id,nodes,msg,hdr)=>{const el=$(id+"L");el.innerHTML="";if(hdr){const h=document.createElement("div");h.className="empty";h.textContent=hdr;el.append(h)}if(!nodes.length){const m=document.createElement("div");m.className="empty";m.textContent=msg;el.append(m);return}el.append(...nodes)};
+const dlabel=d=>parse(d).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+
+function render(){
+  ensure();
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.k===tab));
+  Object.keys(PAGES).forEach(k=>$("p-"+k).hidden=k!==tab);
+  const days=[...Array(7)].map((_,i)=>iso(new Date(start.getTime()+i*864e5)));
+  const end=parse(days[6]),cur=iso(start)===CUR;
+  $("wlbl").textContent=cur?"This week":"Week of "+fmtD(start);
+  $("wsub").textContent=fmtD(start)+" – "+fmtD(end)+", "+end.getFullYear();
+  $("next").disabled=cur;
+  const wd=d=>parse(d).toLocaleDateString(undefined,{weekday:"short"});
+  const inWk=k=>data.filter(e=>e.kind===k&&days.includes(e.date));
+
+  const sel=days[selIdx];
+  const strip=k=>{$(k+"D").innerHTML=days.map((d,i)=>`<button type="button" data-i="${i}" class="${i===selIdx?"on":""}">${wd(d)}<small>${parse(d).getDate()}</small></button>`).join("");$(k+"D").onclick=e=>{const b=e.target.closest("button");if(b){selIdx=+b.dataset.i;render()}}};
+  if(tab==="lift"){
+    const wk=inWk("lift"),day=wk.filter(e=>e.date===sel),v=days.map(d=>wk.filter(e=>e.date===d).reduce((a,e)=>a+vol(e),0));
+    stats("lift",[[n0(day.reduce((a,e)=>a+vol(e),0)),"Volume (day, lbs)"],[day.filter(e=>e.wt).reduce((a,e)=>a+e.sets,0),"Sets logged (day)"],[n0(v.reduce((a,b)=>a+b,0)),"Volume (week, lbs)"]]);
+    chart("lift",days.map(wd),v,scale(v),n0);
+    strip("lift");
+    fill("lift",[...day].sort((a,b)=>a.id-b.id).map(e=>{
+      let extra=null;
+      if(!e.wt){extra=document.createElement("div");extra.className="plan";
+        const i=document.createElement("input");i.type="number";i.min="0";i.step="0.5";i.placeholder="lbs";i.setAttribute("aria-label","Weight in lbs");
+        const b=document.createElement("button");b.textContent="Log";
+        b.onclick=()=>{const w=parseFloat(i.value);if(w>0){e.wt=w;save();render()}};
+        extra.append(i,b);}
+      return row(e.name,`${e.sets}×${e.reps}`+(e.wt?` @ ${e.wt} lbs`:" · enter weight"),e.id,extra)}),
+      "No exercises on this day.",dlabel(sel));
+  }
+  if(tab==="run"){
+    const wk=inWk("run"),day=wk.filter(e=>e.date===sel);
+    const dm=day.reduce((a,e)=>a+e.mi,0),dn=day.reduce((a,e)=>a+e.mins,0);
+    const v=days.map(d=>+wk.filter(e=>e.date===d).reduce((a,e)=>a+e.mi,0).toFixed(1));
+    stats("run",[[dm.toFixed(1),"Miles (day)"],[pace(dm,dn),"Pace /mi (day)"],[v.reduce((a,b)=>a+b,0).toFixed(1),"Miles (week)"]]);
+    chart("run",days.map(wd),v,scale(v));
+    strip("run");
+    fill("run",[...day].sort((a,b)=>a.id-b.id).map(e=>row(e.mi+" mi",`${e.mins} min · ${pace(e.mi,e.mins)}/mi`,e.id)),"No runs on this day.",dlabel(sel));
+  }
+  if(tab==="food"){
+    const wk=inWk("food"),sel=days[selIdx],day=wk.filter(e=>e.date===sel);
+    const tc=a=>a.reduce((s,e)=>s+e.cal,0),tp=a=>a.reduce((s,e)=>s+e.pro,0);
+    const v=days.map(d=>tc(wk.filter(e=>e.date===d))),dl=v.filter(x=>x).length;
+    stats("food",[[n0(tc(day)),"Calories (day)"],[n0(tp(day))+" g","Protein (day)"],[dl?n0(tc(wk)/dl):0,"Avg cal / day"]]);
+    chart("food",days.map(wd),v,scale(v),n0);
+    $("foodD").innerHTML=days.map((d,i)=>`<button type="button" data-i="${i}" class="${i===selIdx?"on":""}">${wd(d)}<small>${parse(d).getDate()}</small></button>`).join("");
+    $("foodD").onclick=e=>{const b=e.target.closest("button");if(b){selIdx=+b.dataset.i;render()}};
+    const el=$("foodL");el.innerHTML="";
+    const hd=document.createElement("div");hd.className="empty";hd.textContent=dlabel(sel);el.append(hd);
+    MEALS.forEach(m=>{
+      const items=day.filter(e=>e.meal===m),box=document.createElement("div");box.className="meal";
+      const h=document.createElement("h3");h.append(m);const sp=document.createElement("span");sp.textContent=`${n0(tc(items))} cal · ${n0(tp(items))} g protein`;h.append(sp);box.append(h);
+      if(!items.length){const em=document.createElement("div");em.className="empty";em.textContent="Nothing logged";box.append(em)}
+      items.forEach(e=>box.append(row(e.name,`${n0(e.cal)} cal`+(e.pro?` · ${e.pro} g protein`:""),e.id)));
+      el.append(box);
+    });
+    const t=document.createElement("div");t.className="total";t.innerHTML=`<span>Day total</span><span>${n0(tc(day))} cal · ${n0(tp(day))} g protein</span>`;el.append(t);
+  }
+  if(tab==="bw"){
+    const ws=[...Array(8)].map((_,i)=>addDays(iso(start),-7*(7-i)));
+    const last=w=>{const l=data.filter(e=>e.kind==="bw"&&wkOf(e.date)===w).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);return l.length?l[l.length-1].lbs:0};
+    const v=ws.map(last),logged=v.filter(x=>x),lo=Math.min(...logged)-2,hi=Math.max(...logged,lo+3);
+    const now=v[7],prev=[...v.slice(0,7)].reverse().find(x=>x);
+    stats("bw",[[now?now.toFixed(1):"–","This week (lbs)"],[now&&prev?(now-prev>0?"+":"")+(now-prev).toFixed(1):"–","Change vs last logged"],[logged.length,"Weeks logged (of 8)"]]);
+    chart("bw",ws.map(w=>parse(w).getMonth()+1+"/"+parse(w).getDate()),v,v.map(x=>x?15+(x-lo)/(hi-lo)*65:0),x=>x.toFixed(0));
+    fill("bw",inWk("bw").sort((a,b)=>b.date.localeCompare(a.date)).map(e=>row(e.lbs+" lbs",dlabel(e.date),e.id)),"No weigh-in this week.");
+  }
+}
+render();
+</script>
+</body>
+</html>
